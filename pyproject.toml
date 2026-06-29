@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mewon"
+version = "0.1.0"
+description = "Persistent spectral coordinates, Muon variants, noise-aware whitening, and rotate-then-compress experiments."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = [
+  "numpy>=1.23",
+  "torch>=2.1",
+  "pyyaml>=6.0",
+  "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+tracking = ["aim>=3.17", "tensorboard>=2.14"]
+analysis = ["pandas>=2.0", "matplotlib>=3.7", "plotly>=5.18", "scipy>=1.10"]
+transport = ["cvxpy>=1.4", "scipy>=1.10"]
+hf = ["transformers>=4.40", "datasets>=2.18", "tokenizers>=0.15"]
+vision = ["torchvision>=0.16"]
+test = ["pytest>=7.4"]
+all = ["aim>=3.17", "tensorboard>=2.14", "pandas>=2.0", "matplotlib>=3.7", "plotly>=5.18", "scipy>=1.10", "cvxpy>=1.4", "transformers>=4.40", "datasets>=2.18", "tokenizers>=0.15", "torchvision>=0.16", "pytest>=7.4"]
+
+[project.scripts]
+mewon = "mewon.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mewon*"]
+
+[tool.pytest.ini_options]
+python_files = ["test*.py"]
+python_functions = ["test*"]

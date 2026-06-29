@@ -1,0 +1,9 @@
+seed: 0
+device: cpu
+tracking:
+  aim: false
+  tensorboard: false
+experiments:
+  theorem: {trials: 20}
+  synthetic: {steps: 100, conds: [100, 10000]}
+  lm: {steps: 200, optimizers: [adamw, muon, softmuon, mewondiag, mewon]}

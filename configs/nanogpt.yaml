@@ -1,0 +1,5 @@
+repo: external/nanoGPT
+data: openwebtext
+optimizers: [adamw, muon, softmuon, mewondiag, mewon]
+seeds: [0,1,2]
+patch_mode: guarded

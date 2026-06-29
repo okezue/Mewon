@@ -1,0 +1,5 @@
+aws_region: ${AWS_REGION}
+s3_bucket: ${S3_BUCKET}
+instance_type: p5.48xlarge
+ami_id: PLACEHOLDER_SUPPLY_DEEP_LEARNING_AMI
+key_name: PLACEHOLDER_SUPPLY_KEYPAIR

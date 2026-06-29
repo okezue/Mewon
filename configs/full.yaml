@@ -1,0 +1,10 @@
+seed: 0
+device: cuda
+seeds: [0, 1, 2, 3, 4]
+tracking: {aim: true, tensorboard: true}
+experiments:
+  theorem: {trials: 200}
+  synthetic: {steps: 2000, conds: [100, 10000, 1000000]}
+  mmd: {steps: 2000, ps: [1, 2, inf]}
+  compression: {bits: [2, 3, 4, 6, 8], ranks: [4, 8, 16, 32, 64]}
+  lm: {steps: 5000, optimizers: [adamw, muon, softmuon, mewondiag, mewon], widths: [256, 512, 768]}
