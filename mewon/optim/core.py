@@ -13,7 +13,7 @@ def randbasis(m,n,r,dev,dtype,eps):
     return orthon(U,eps),orthon(V,eps)
 
 @torch.no_grad()
-def updatebasis(mat,U,V,rank,piters=1,eps=1e-6):
+def updatebasis(mat,U,V,rank,piters=1,eps=1e-6,align=True):
     m,n=mat.shape; r=min(rank,m,n); M=mat.float()
     if U is None or V is None or tuple(U.shape)!=(m,r) or tuple(V.shape)!=(n,r) or not torch.isfinite(U).all() or not torch.isfinite(V).all():
         U,V=randbasis(m,n,r,M.device,M.dtype,eps)
@@ -26,6 +26,10 @@ def updatebasis(mat,U,V,rank,piters=1,eps=1e-6):
         if not torch.isfinite(Z).all() or float(Z.norm())<=eps:
             U,V=randbasis(m,n,r,M.device,M.dtype,eps); Z=M.T@U
         V=orthon(Z,eps)
+    if align:
+        C=U.T@M@V
+        if torch.isfinite(C).all():
+            Uc,_,Vch=torch.linalg.svd(C); U=U@Uc; V=V@Vch.T
     return U,V
 
 class ExactSoftMuon(Optimizer):
@@ -99,7 +103,7 @@ class Mewon(Optimizer):
                     upd=softmuon(M,gr['lam'],gr['rho']).float()
                 else:
                     if st['step']==1 or st['step']%gr['freq']==0:
-                        st['U'],st['V']=updatebasis(M,st.get('U'),st.get('V'),gr['rank'],gr['piters'],gr['eps'])
+                        st['U'],st['V']=updatebasis(M,st.get('U'),st.get('V'),gr['rank'],gr['piters'],gr['eps'],align=gr['mode']!='diag')
                     U,V=st['U'],st['V']
                     C=U.T@M@V; diag=torch.diagonal(C)
                     st['vd'].mul_(b2).add_(diag.square(),alpha=1-b2)
