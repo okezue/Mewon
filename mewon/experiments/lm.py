@@ -1,5 +1,5 @@
 import torch
-from mewon.data.char import CharDataset,corpus
+from mewon.data.char import CharDataset,corpus,splittext
 from mewon.models.gpt import GPT
 from mewon.optim import Mewon,MewonR,Muon,ExactSoftMuon
 from mewon.tracking import RunLogger
@@ -25,19 +25,21 @@ def evaluate(model,data,dev,batches=10):
         x,y=data.getbatch(8,dev); _,loss=model(x,y); losses.append(float(loss.cpu()))
     model.train(); return sum(losses)/len(losses)
 
-def run(outdir,seed=0,opt='mewon',steps=100,dev=None,nlayer=2,nhead=2,nembd=64,blk=64,lr=None,rank=8,freq=4,piters=1):
-    setseed(seed); dev=getdev(dev); data=CharDataset(corpus(120),blk)
+def run(outdir,seed=0,opt='mewon',steps=100,dev=None,nlayer=2,nhead=2,nembd=64,blk=64,lr=None,rank=8,freq=4,piters=1,datapath=None,bs=8):
+    setseed(seed); dev=getdev(dev)
+    if datapath: data,val=splittext(datapath,blk)
+    else: data=val=CharDataset(corpus(120),blk)
     model=GPT(data.vocab,blk,nlayer=nlayer,nhead=nhead,nembd=nembd).to(dev)
     if lr is None: lr=0.03 if opt!='adamw' else 2e-3
     opts=buildopt(model,opt,lr,rank,freq,piters)
     log=RunLogger(outdir,f'lm-{opt}-seed{seed}',{'optimizer':opt,'steps':steps})
     for step in range(steps):
-        x,y=data.getbatch(8,dev)
+        x,y=data.getbatch(bs,dev)
         for o in opts: o.zero_grad(set_to_none=True)
         _,loss=model(x,y); loss.backward(); torch.nn.utils.clip_grad_norm_(model.parameters(),1.0)
         for o in opts: o.step()
         if step%10==0 or step==steps-1:
-            metrics={'train_loss':float(loss.detach().cpu()),'eval_loss':evaluate(model,data,dev,batches=4)}
+            metrics={'train_loss':float(loss.detach().cpu()),'eval_loss':evaluate(model,val,dev,batches=4)}
             for o in opts:
                 if hasattr(o,'diagstate'):
                     rows=o.diagstate()
