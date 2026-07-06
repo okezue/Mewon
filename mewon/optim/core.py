@@ -138,8 +138,8 @@ class Mewon(Optimizer):
         return rows
 
 class MewonR(Optimizer):
-    def __init__(self,params,lr=1e-3,momentum=0.95,beta2=0.98,lam=1.0,tau=1e-6,aspect=True,wd=0.0):
-        super().__init__(params,dict(lr=lr,momentum=momentum,beta2=beta2,lam=lam,tau=tau,aspect=aspect,wd=wd))
+    def __init__(self,params,lr=1e-3,momentum=0.95,beta2=0.98,lam=1.0,tau=1e-8,clip=1.5,aspect=True,wd=0.0):
+        super().__init__(params,dict(lr=lr,momentum=momentum,beta2=beta2,lam=lam,tau=tau,clip=clip,aspect=aspect,wd=wd))
     @torch.no_grad()
     def step(self,closure=None):
         loss=None
@@ -152,15 +152,24 @@ class MewonR(Optimizer):
                 if gr['wd']: p.mul_(1-gr['lr']*gr['wd'])
                 st=self.state[p]
                 if 'm' not in st:
-                    st['m']=torch.zeros_like(p,dtype=torch.float32); st['v']=torch.zeros(min(p.shape),device=p.device); st['metrics']={}
-                M=st['m'].mul_(gr['momentum']).add_(p.grad.float(),alpha=1-gr['momentum'])
+                    st['m']=torch.zeros_like(p,dtype=torch.float32); st['nu']=torch.zeros(min(p.shape),device=p.device); st['rbar']=0.0; st['metrics']={}
+                g=p.grad.float()
+                if gr['clip']:
+                    gn=float(g.norm())
+                    if st['rbar']==0.0: st['rbar']=gn
+                    th=gr['clip']*st['rbar']
+                    if gn>th: g=g*(th/gn)
+                    st['rbar']=gr['beta2']*st['rbar']+(1-gr['beta2'])*min(gn,th)
+                M=st['m'].mul_(gr['momentum']).add_(g,alpha=1-gr['momentum'])
                 U,s,V=rectsvd(M)
-                st['v'].mul_(gr['beta2']).add_(s.square(),alpha=1-gr['beta2'])
-                d=s/(s.square()+gr['lam']*st['v']+gr['tau']**2).sqrt()
+                c=torch.diagonal(U.T@g@V)
+                st['nu'].mul_(gr['beta2']).add_((c-s).square(),alpha=1-gr['beta2'])
+                nu=torch.maximum(st['nu'],st['nu'].median())
+                d=s/(s.square()+gr['lam']*nu+gr['tau']**2).sqrt()
                 D=(U*d.unsqueeze(0))@V.T
-                g=(p.shape[0]/p.shape[1])**0.5 if gr['aspect'] else 1.0
-                st['metrics']={'sv_max':float(s.max()),'sv_min':float(s.min()),'shaped_min':float(d.min()),'aspect':g}
-                p.add_((-g*D).to(p.dtype),alpha=gr['lr'])
+                a=(p.shape[0]/p.shape[1])**0.5 if gr['aspect'] else 1.0
+                st['metrics']={'sv_max':float(s.max()),'shaped_min':float(d.min()),'shaped_max':float(d.max()),'aspect':a}
+                p.add_((-a*D).to(p.dtype),alpha=gr['lr'])
         return loss
     def diagstate(self):
         return [self.state[p]['metrics']|{'shape':tuple(p.shape)} for gr in self.param_groups for p in gr['params'] if p in self.state and 'metrics' in self.state[p]]
