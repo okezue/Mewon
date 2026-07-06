@@ -1,2 +1,2 @@
-from .ops import hardmuon,softmuon,schatten,specclip,nsorth,polarmuon
-from .core import Mewon,ExactSoftMuon,Muon,updatebasis
+from .ops import hardmuon,softmuon,schatten,specclip,nsorth,polarmuon,rectsvd,qrpolar
+from .core import Mewon,MewonR,ExactSoftMuon,Muon,updatebasis

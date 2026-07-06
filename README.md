@@ -33,14 +33,21 @@ FineWeb-scale runs need your own compute and cache:
 RUN_FINEWEB=1 PREPARE_FINEWEB=1 FINEWEB_TOKENS=1000000000 bash scripts/fullsuite.sh
 ```
 
-## Optimizer
+## Optimizers
+
+```python
+from mewon.optim import MewonR
+opt = MewonR(params, lr=0.01, lam=1.0, aspect=True)
+```
+
+`MewonR` is the rectangular-native flagship. Householder QR reduces the momentum to its small square factor, an exact thin SVD there replaces Newton-Schulz (which is 20-70% off the true polar factor on ill-conditioned rectangular matrices), singular values are shaped by `d=s/sqrt(s^2+lam*v+tau^2)` with `v` an EMA of `s^2`, and the update is scaled by `sqrt(dout/din)`. `lam=0, aspect=False` reproduces Muon's polar direction exactly; `lam*v >> s^2` recovers Adam-style whitening per singular direction — a continuous Muon-to-Adam interpolation in the singular-value domain. State beyond momentum is one length-`min(m,n)` vector.
 
 ```python
 from mewon.optim import Mewon
 opt = Mewon(params, lr=0.03, rank=16, freq=8, mode='softpolar', resid=0.05)
 ```
 
-Modes: `diag` (cached diagonal whitening), `core` (full r×r core whitening), `softpolar` (`C/sqrt(C^2+nw*Var+tau^2)`, usually best for training), `exactsoft` (exact soft-Muon on full momentum).
+`Mewon` is the persistent low-rank variant. Modes: `diag` (cached diagonal whitening), `core` (full r×r core whitening), `softpolar` (`C/sqrt(C^2+nw*Var+tau^2)`), `exactsoft` (exact soft-Muon on full momentum).
 
 ## What's inside
 

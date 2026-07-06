@@ -47,14 +47,24 @@ def orthon(y,eps=1e-6):
 
 def nsorth(g,steps=5,eps=1e-7):
     if g.ndim!=2: raise ValueError('nsorth expects a matrix')
-    x=fmat(g); x=x/x.norm().clamp_min(eps)
+    a,b,c=3.4445,-4.7750,2.0315
+    x=fmat(g); x=x/(x.norm()+eps)
     tr=False
-    if x.shape[0]<x.shape[1]: x=x.T; tr=True
-    I=torch.eye(x.shape[1],device=x.device,dtype=x.dtype)
+    if x.shape[0]>x.shape[1]: x=x.T; tr=True
     for _ in range(steps):
-        x=0.5*x@(3*I-x.T@x)
+        A=x@x.T; x=a*x+(b*A+c*A@A)@x
     if tr: x=x.T
     return x.to(g.dtype)
+
+def rectsvd(M):
+    if M.shape[0]>=M.shape[1]:
+        Q,R=torch.linalg.qr(M); Ur,s,Vh=torch.linalg.svd(R,full_matrices=False)
+        return Q@Ur,s,Vh.T
+    Q,R=torch.linalg.qr(M.T); Ur,s,Vh=torch.linalg.svd(R,full_matrices=False)
+    return Vh.T,s,Q@Ur
+
+def qrpolar(M):
+    U,s,V=rectsvd(M); return U@V.T
 
 def polarmuon(g,scale='nuclear',steps=5):
     q=nsorth(g,steps=steps)

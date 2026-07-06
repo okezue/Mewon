@@ -1,7 +1,7 @@
 import torch
 from mewon.data.char import CharDataset,corpus
 from mewon.models.gpt import GPT
-from mewon.optim import Mewon,Muon,ExactSoftMuon
+from mewon.optim import Mewon,MewonR,Muon,ExactSoftMuon
 from mewon.tracking import RunLogger
 from mewon.utils import setseed,splitparams,getdev
 
@@ -10,6 +10,8 @@ def buildopt(model,name,lr,rank=8,freq=4,piters=1):
     spec,aux=splitparams(model)
     ao=torch.optim.AdamW(aux,lr=min(lr,2e-3),betas=(0.9,0.95),weight_decay=0.01) if aux else None
     if name=='muon': so=Muon(spec,lr=lr,scale='rms')
+    elif name=='mewonr': so=MewonR(spec,lr=lr)
+    elif name=='mewonr0': so=MewonR(spec,lr=lr,lam=0.0)
     elif name=='softmuon': so=ExactSoftMuon(spec,lr=lr,lam=1.0,rho=1.0)
     elif name=='mewondiag': so=Mewon(spec,lr=lr,mode='diag',rank=rank,freq=freq,piters=piters)
     elif name=='mewoncore': so=Mewon(spec,lr=lr,mode='core',rank=rank,freq=freq,piters=piters)

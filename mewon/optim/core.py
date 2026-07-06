@@ -1,7 +1,7 @@
 import math
 import torch
 from torch.optim import Optimizer
-from .ops import softmuon,orthon,nsorth
+from .ops import softmuon,orthon,nsorth,rectsvd
 
 def rms(x,eps=1e-12):
     return x.norm()/math.sqrt(max(1,x.numel()))+eps
@@ -136,3 +136,31 @@ class Mewon(Optimizer):
                 if st and 'metrics' in st:
                     rows.append(st['metrics']|{'shape':tuple(p.shape),'step':st.get('step',0)})
         return rows
+
+class MewonR(Optimizer):
+    def __init__(self,params,lr=1e-3,momentum=0.95,beta2=0.98,lam=1.0,tau=1e-6,aspect=True,wd=0.0):
+        super().__init__(params,dict(lr=lr,momentum=momentum,beta2=beta2,lam=lam,tau=tau,aspect=aspect,wd=wd))
+    @torch.no_grad()
+    def step(self,closure=None):
+        loss=None
+        if closure is not None:
+            with torch.enable_grad(): loss=closure()
+        for gr in self.param_groups:
+            for p in gr['params']:
+                if p.grad is None: continue
+                if p.ndim!=2: raise ValueError('MewonR only supports 2D params')
+                if gr['wd']: p.mul_(1-gr['lr']*gr['wd'])
+                st=self.state[p]
+                if 'm' not in st:
+                    st['m']=torch.zeros_like(p,dtype=torch.float32); st['v']=torch.zeros(min(p.shape),device=p.device); st['metrics']={}
+                M=st['m'].mul_(gr['momentum']).add_(p.grad.float(),alpha=1-gr['momentum'])
+                U,s,V=rectsvd(M)
+                st['v'].mul_(gr['beta2']).add_(s.square(),alpha=1-gr['beta2'])
+                d=s/(s.square()+gr['lam']*st['v']+gr['tau']**2).sqrt()
+                D=(U*d.unsqueeze(0))@V.T
+                g=(p.shape[0]/p.shape[1])**0.5 if gr['aspect'] else 1.0
+                st['metrics']={'sv_max':float(s.max()),'sv_min':float(s.min()),'shaped_min':float(d.min()),'aspect':g}
+                p.add_((-g*D).to(p.dtype),alpha=gr['lr'])
+        return loss
+    def diagstate(self):
+        return [self.state[p]['metrics']|{'shape':tuple(p.shape)} for gr in self.param_groups for p in gr['params'] if p in self.state and 'metrics' in self.state[p]]
