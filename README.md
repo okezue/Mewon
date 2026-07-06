@@ -49,6 +49,10 @@ opt = Mewon(params, lr=0.03, rank=16, freq=8, mode='softpolar', resid=0.05)
 
 `Mewon` is the persistent low-rank variant. Modes: `diag` (cached diagonal whitening), `core` (full r×r core whitening), `softpolar` (`C/sqrt(C^2+nw*Var+tau^2)`), `exactsoft` (exact soft-Muon on full momentum).
 
+## Results
+
+Tiny-Shakespeare char-LM (0.8M-param 4-layer GPT, held-out val loss, 1200 steps, 2 seeds, per-optimizer tuned lr at interior optima): MewonR 1.715±0.002, AdamW 1.792±0.007, soft-Muon 2.460, Muon 2.523. Ill-conditioned LS (cond 1e4, clean objective): MewonR 5.8e-9 vs AdamW 2.6e-8, soft-Muon 6.3e-5; with fresh gradient noise MewonR 3.3e-6 vs AdamW 4.3e-6. Heavy-tailed data x~t(2) (rank-1 gradient outliers): MewonR beats AdamW on all tested shapes (44/3.9/50 vs 115/88/84). Known structural exception: elementwise-iid heavy noise is coordinate-aligned (Adam's matched basis) — MewonR trails ~3x there.
+
 ## What's inside
 
 - `mewon/optim` — `Mewon`, `Muon`, `ExactSoftMuon`, Schatten selectors, hard/soft Muon, Newton-Schulz, cached whitening.
