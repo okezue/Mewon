@@ -57,12 +57,13 @@ def nsorth(g,steps=5,eps=1e-7):
     return x.to(g.dtype)
 
 def smallsvd(R):
+    Rc=R.cpu() if R.device.type=='mps' else R
     try:
-        U,s,Vh=torch.linalg.svd(R.double(),full_matrices=False)
+        U,s,Vh=torch.linalg.svd(Rc.double(),full_matrices=False)
     except Exception:
-        J=1e-7*R.norm()*torch.randn_like(R)
-        U,s,Vh=torch.linalg.svd((R+J).double(),full_matrices=False)
-    return U.to(R.dtype),s.to(R.dtype),Vh.to(R.dtype)
+        J=1e-7*Rc.norm()*torch.randn_like(Rc)
+        U,s,Vh=torch.linalg.svd((Rc+J).double(),full_matrices=False)
+    return U.to(device=R.device,dtype=R.dtype),s.to(device=R.device,dtype=R.dtype),Vh.to(device=R.device,dtype=R.dtype)
 
 def rectsvd(M):
     if M.shape[0]>=M.shape[1]:
