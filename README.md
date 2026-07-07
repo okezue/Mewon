@@ -58,7 +58,7 @@ opt = MewonP(params, lr=0.03, rank=16, freq=8, mode='softpolar', resid=0.05)
 
 ## Results
 
-Tiny-Shakespeare char-LM (0.8M-param 4-layer GPT, held-out val loss, 1200 steps, 2 seeds, per-optimizer tuned lr at interior optima): MewonR 1.715±0.002, AdamW 1.792±0.007, soft-Muon 2.460, Muon 2.523. Ill-conditioned LS (cond 1e4, clean objective): MewonR 5.8e-9 vs AdamW 2.6e-8, soft-Muon 6.3e-5; with fresh gradient noise MewonR 3.3e-6 vs AdamW 4.3e-6. Heavy-tailed data x~t(2) (rank-1 gradient outliers): MewonR beats AdamW on all tested shapes (44/3.9/50 vs 115/88/84). Known structural exception: elementwise-iid heavy noise is coordinate-aligned (Adam's matched basis) — MewonR trails ~3x there.
+Tiny-Shakespeare char-LM (0.8M-param 4-layer GPT, held-out val loss, 1200 steps, 2 seeds, per-optimizer tuned lr at interior optima): Mewon 1.720±0.008, MewonR 1.715±0.002, AdamW 1.792±0.007, soft-Muon 2.460, Muon 2.523. Ill-conditioned LS (cond 1e4, clean objective): MewonR 5.1e-9, Mewon 5.0e-8, AdamW 2.6e-8, soft-Muon 6.3e-5; with fresh gradient noise MewonR 3.3e-6, AdamW 4.3e-6, Mewon 5.6e-6. Heavy-tailed data x~t(2) (rank-1 gradient outliers): Mewon 40/7.1/98 and MewonR 44/3.6/50 vs AdamW 115/88/84. Elementwise-iid heavy noise (the MP bulk itself): Mewon 5.2/5.3 beats AdamW 7.4/7.7 — the only optimizer here that does; MewonR trails ~3x (coordinate-aligned noise is Adam's matched basis; the bulk edge is its spectral counter). Pure-noise momentum yields exactly zero spectral update under Mewon (regression-tested).
 
 ## What's inside
 
