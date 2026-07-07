@@ -6,7 +6,7 @@ from mewon.tracking import RunLogger
 
 def run(outdir,seed=0,steps=20,dev='cpu'):
     setseed(seed); dev=torch.device(dev); model=ViT().to(dev); spec,aux=splitparams(model)
-    o1=Mewon(spec,lr=0.03,rank=8); o2=torch.optim.AdamW(aux,lr=1e-3)
+    o1=Mewon(spec,lr=0.03); o2=torch.optim.AdamW(aux,lr=1e-3)
     log=RunLogger(outdir,f'vision-seed{seed}',{})
     for step in range(steps):
         x=torch.randn(8,3,32,32,device=dev); y=torch.randint(0,10,(8,),device=dev)

@@ -1,6 +1,6 @@
 import torch
 from mewon.data.synthetic import lsprob,driftmat
-from mewon.optim import Mewon,ExactSoftMuon,Muon
+from mewon.optim import Mewon,MewonP,ExactSoftMuon,Muon
 from mewon.tracking import RunLogger
 from mewon.utils import setseed
 
@@ -8,8 +8,9 @@ def makeopt(name,params,lr):
     if name=='adamw': return torch.optim.AdamW(params,lr=lr)
     if name=='muon': return Muon(params,lr=lr,scale='rms')
     if name=='softmuon': return ExactSoftMuon(params,lr=lr,lam=1.0,rho=1.0)
-    if name=='mewondiag': return Mewon(params,lr=lr,mode='diag',rank=8,freq=4)
-    return Mewon(params,lr=lr,mode='softpolar',rank=8,freq=4,resid=0.05)
+    if name=='mewondiag': return MewonP(params,lr=lr,mode='diag',rank=8,freq=4)
+    if name=='mewonp': return MewonP(params,lr=lr,mode='softpolar',rank=8,freq=4,resid=0.05)
+    return Mewon(params,lr=lr)
 
 def runls(outdir,seed=0,steps=100,opt='mewon',cond=1e4,dev='cpu'):
     setseed(seed); dev=torch.device(dev); A,B,Y,W=lsprob(32,32,cond,dev=dev)

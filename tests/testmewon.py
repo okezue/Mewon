@@ -1,7 +1,6 @@
 import math
 import torch
-from mewon.optim.bask import despike,align,mpmed
-from mewon.optim import Bask
+from mewon.optim import Mewon,despike,align,mpmed
 
 def testdespike():
     phi=4.0; sig=1.0
@@ -23,7 +22,7 @@ def testalign():
 def testpurenoise():
     torch.manual_seed(0)
     p=torch.nn.Parameter(torch.zeros(200,50))
-    o=Bask([p],lr=1.0,momentum=0.9,zeta=0.0,clip=0.0)
+    o=Mewon([p],lr=1.0,momentum=0.9,zeta=0.0,clip=0.0)
     for _ in range(30):
         p.grad=torch.randn(200,50); o.step()
     st=o.state[p]['metrics']
@@ -35,7 +34,7 @@ def testspikerecovery():
     u=torch.zeros(200,1); u[0]=1; v=torch.zeros(50,1); v[0]=1
     S=8.0*math.sqrt(50)*(u@v.T)
     p=torch.nn.Parameter(torch.zeros(200,50))
-    o=Bask([p],lr=1.0,momentum=0.9,zeta=0.0,clip=0.0,aspect=False)
+    o=Mewon([p],lr=1.0,momentum=0.9,zeta=0.0,clip=0.0,aspect=False)
     for _ in range(60):
         p.grad=S+torch.randn(200,50); o.step()
     st=o.state[p]['metrics']

@@ -1,11 +1,11 @@
 # Mewon: NanoGPT / modded-nanogpt notes
 
-Smallest practical way to try `Mewon` in a NanoGPT-style loop. The patcher in `mewon/integrations/nanogpt.py` does steps 1-2 automatically and is guarded: it backs up `train.py`, aborts if the optimizer anchor is missing, and is idempotent.
+Smallest practical way to try `MewonP` in a NanoGPT-style loop. The patcher in `mewon/integrations/nanogpt.py` does steps 1-2 automatically and is guarded: it backs up `train.py`, aborts if the optimizer anchor is missing, and is idempotent.
 
 ## 1) Import
 
 ```python
-from mewon.optim import Mewon
+from mewon.optim import MewonP
 ```
 
 ## 2) Split parameters
@@ -22,7 +22,7 @@ def splitparams(model):
     return spec,aux
 
 spec,aux=splitparams(model)
-ospec=Mewon(spec,lr=0.03,betas=(0.95,0.98),rank=16,freq=8,piters=1,nw=1.0,tau=1e-3,resid=0.1,wd=0.0)
+ospec=MewonP(spec,lr=0.03,betas=(0.95,0.98),rank=16,freq=8,piters=1,nw=1.0,tau=1e-3,resid=0.1,wd=0.0)
 oaux=torch.optim.AdamW(aux,lr=adamw_lr,betas=(0.9,0.95),weight_decay=wd)
 ```
 
@@ -41,7 +41,7 @@ Without AMP just call `ospec.step(); oaux.step()`.
 
 ## 4) Log per spectral layer
 
-`Mewon.diagstate()` returns energy capture and off-diagonal leakage per tracked parameter. Track those, residual ratio `||M-U(U^T M V)V^T||/||M||`, principal-angle drift after refresh, and optimizer-step wallclock.
+`MewonP.diagstate()` returns energy capture and off-diagonal leakage per tracked parameter. Track those, residual ratio `||M-U(U^T M V)V^T||/||M||`, principal-angle drift after refresh, and optimizer-step wallclock.
 
 ## 5) First ablations
 

@@ -566,7 +566,7 @@ A result is genuinely interesting if you get at least one of these:
 
 ## 19. Code map
 
-- `mewon/optim/core.py` — `Mewon`, `Muon`, `ExactSoftMuon`, `updatebasis`
+- `mewon/optim/core.py` — `Mewon`, `MewonP`, `MewonR`, `Muon`, `ExactSoftMuon`, `updatebasis`
 - `mewon/optim/ops.py` — `softmuon`, `hardmuon`, `schatten`, `nsorth`, `polarmuon`
 - `mewon/experiments/` — theorem regressions, synthetic optim, compression, mmd, transport, lm, probe, kernels, vision
 - `mewon/diag.py`, `mewon/quant.py` — basis diagnostics and rotate-then-compress

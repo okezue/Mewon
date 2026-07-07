@@ -36,18 +36,25 @@ RUN_FINEWEB=1 PREPARE_FINEWEB=1 FINEWEB_TOKENS=1000000000 bash scripts/fullsuite
 ## Optimizers
 
 ```python
+from mewon.optim import Mewon
+opt = Mewon(params, lr=0.02, lam=1.0, clip=1.5, zeta=0.05)
+```
+
+`Mewon` is the flagship: a bulk-aware spike-polar optimizer that treats momentum as a spiked random matrix rather than a set of scalar singular channels. Gradients pass a bounded-influence gate (`clip` times an EMA of clipped norms). The gradient-noise scale is estimated from the median singular value of the innovation `g - m` against the precomputed Marchenko-Pastur median for the layer's aspect ratio; the momentum noise scale follows from the exact EMA attenuation `(1-b)/(1+b)*(1+b^t)/(1-b^t)`. Only singular values above the MP bulk edge `sigma*(1+sqrt(phi))` (plus a `k^(-2/3)` Tracy-Widom margin) are treated as signal; those are de-biased through the BBP spike inversion `theta^2=(A+sqrt(A^2-4*phi*sigma^4))/2`, attenuated by the Benaych-Georges-Nadakuditi singular-vector alignment, and gated by `theta/sqrt(theta^2+lam*sigma^2)`. Below-edge structure is served by a small rms-normalized residual path that fades as spikes explain the step. Pure-noise momentum produces exactly zero spectral update — where Muon takes a full polar step in a random direction. Exact rectangular SVD via Householder QR; update scaled by `sqrt(dout/din)`. State beyond momentum: two scalars and one cached constant.
+
+```python
 from mewon.optim import MewonR
 opt = MewonR(params, lr=0.01, lam=1.0, aspect=True)
 ```
 
-`MewonR` is the rectangular-native flagship. Gradients pass a bounded-influence gate (`clip` times an EMA of clipped norms — outliers cannot corrupt momentum or scale estimates, per clipped-SGD theory for alpha-stable noise). Householder QR reduces the momentum to its small square factor and an exact thin SVD there replaces Newton-Schulz (which is 20-70% off the true polar factor on ill-conditioned rectangular matrices). Per-direction noise is estimated honestly from the dispersion of the raw gradient around the momentum in the singular frame, `nu=EMA((diag(U^T g V)-s)^2)`, floored at its median across directions (permutation-immune, outlier-robust); singular values are then Wiener-gated by `d=s/sqrt(s^2+lam*nu+tau^2)` and the update scaled by `sqrt(dout/din)`. High SNR gives `d≈1` (exact polar, conditioning-proof); momentum attenuates noise power by `(1-b)/(1+b)` but not signal, so pure-noise directions land in the linear regime `d∝s` (whitened momentum descent, noise-proof) — a self-gating trust region. `lam=0, aspect=False` reproduces Muon's polar direction exactly. State beyond momentum: one length-`min(m,n)` vector and a scalar.
+`MewonR` is the scalar-channel predecessor: per-direction noise from the dispersion of the raw gradient around momentum in the singular frame, `nu=EMA((diag(U^T g V)-s)^2)` floored at its median, Wiener gate `d=s/sqrt(s^2+lam*nu+tau^2)`, same clip and aspect scaling. `lam=0, aspect=False` reproduces Muon's polar direction exactly.
 
 ```python
-from mewon.optim import Mewon
-opt = Mewon(params, lr=0.03, rank=16, freq=8, mode='softpolar', resid=0.05)
+from mewon.optim import MewonP
+opt = MewonP(params, lr=0.03, rank=16, freq=8, mode='softpolar', resid=0.05)
 ```
 
-`Mewon` is the persistent low-rank variant. Modes: `diag` (cached diagonal whitening), `core` (full r×r core whitening), `softpolar` (`C/sqrt(C^2+nw*Var+tau^2)`), `exactsoft` (exact soft-Muon on full momentum).
+`MewonP` is the persistent low-rank variant. Modes: `diag` (cached diagonal whitening), `core` (full r×r core whitening), `softpolar` (`C/sqrt(C^2+nw*Var+tau^2)`), `exactsoft` (exact soft-Muon on full momentum).
 
 ## Results
 
