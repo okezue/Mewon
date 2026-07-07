@@ -154,6 +154,7 @@ class MewonR(Optimizer):
                 if 'm' not in st:
                     st['m']=torch.zeros_like(p,dtype=torch.float32); st['nu']=torch.zeros(min(p.shape),device=p.device); st['rbar']=0.0; st['metrics']={}
                 g=p.grad.float()
+                if not torch.isfinite(g).all(): continue
                 if gr['clip']:
                     gn=float(g.norm())
                     if st['rbar']==0.0: st['rbar']=gn

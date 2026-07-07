@@ -56,11 +56,19 @@ def nsorth(g,steps=5,eps=1e-7):
     if tr: x=x.T
     return x.to(g.dtype)
 
+def smallsvd(R):
+    try:
+        U,s,Vh=torch.linalg.svd(R.double(),full_matrices=False)
+    except Exception:
+        J=1e-7*R.norm()*torch.randn_like(R)
+        U,s,Vh=torch.linalg.svd((R+J).double(),full_matrices=False)
+    return U.to(R.dtype),s.to(R.dtype),Vh.to(R.dtype)
+
 def rectsvd(M):
     if M.shape[0]>=M.shape[1]:
-        Q,R=torch.linalg.qr(M); Ur,s,Vh=torch.linalg.svd(R,full_matrices=False)
+        Q,R=torch.linalg.qr(M); Ur,s,Vh=smallsvd(R)
         return Q@Ur,s,Vh.T
-    Q,R=torch.linalg.qr(M.T); Ur,s,Vh=torch.linalg.svd(R,full_matrices=False)
+    Q,R=torch.linalg.qr(M.T); Ur,s,Vh=smallsvd(R)
     return Vh.T,s,Q@Ur
 
 def qrpolar(M):
