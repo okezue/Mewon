@@ -79,41 +79,50 @@ class MewonO(Optimizer):
                 r=align(th2,sig,phi)
                 gt=r*th2.sqrt()/(th2+gr['lam']*sig*sig+gr['tau']**2).sqrt()
                 fresh=(gt>0).nonzero().flatten()
+                pend=[]
                 if len(fresh):
-                    Uf=U[:,fresh]; Vf=V[:,fresh]
-                    if st['Ut'] is not None and st['Ut'].shape[1]>0:
-                        ov=(Uf.T@st['Ut']).abs()*(Vf.T@st['Vt']).abs()
-                        best,arg=ov.max(1)
-                        for i in range(len(fresh)):
-                            if float(best[i])>gr['smin']:
-                                j=int(arg[i])
-                                rho=float(r[fresh[i]])
-                                if st['age'][j]<gr['amin'] or rho>0.9:
+                    Uf=U[:,fresh]; Vf=V[:,fresh]; dev=p.device
+                    J0=0 if st['Ut'] is None else st['Ut'].shape[1]
+                    for i in range(len(fresh)):
+                        matched=False
+                        if J0>0:
+                            ov=(Uf[:,i]@st['Ut'][:,:J0]).abs()*(Vf[:,i]@st['Vt'][:,:J0]).abs()
+                            bo,j=ov.max(0)
+                            if float(bo)>gr['smin']:
+                                matched=True; j=int(j)
+                                if st['age'][j]<gr['amin'] or float(r[fresh[i]])>0.9:
                                     su=torch.sign(Uf[:,i]@st['Ut'][:,j]); sv=torch.sign(Vf[:,i]@st['Vt'][:,j])
                                     st['Ut'][:,j]=su*Uf[:,i]; st['Vt'][:,j]=sv*Vf[:,i]
                                 st['fails'][j]=0
-                            elif st['Ut'].shape[1]<gr['rmax']:
+                        if not matched:
+                            born=False
+                            if st.get('pU') is not None and st['pU'].shape[1]>0:
+                                ovp=(Uf[:,i]@st['pU']).abs()*(Vf[:,i]@st['pV']).abs()
+                                born=float(ovp.max())>gr['smin']
+                            if born and (st['Ut'] is None or st['Ut'].shape[1]<gr['rmax']):
                                 u=Uf[:,i:i+1]; v=Vf[:,i:i+1]
-                                z1n=float(u.T@g1@v); z2n=float(u.T@g2@v)
-                                st['Ut']=torch.cat([st['Ut'],u],1); st['Vt']=torch.cat([st['Vt'],v],1)
-                                dev=p.device
-                                st['mh']=torch.cat([st['mh'],torch.tensor([0.5*(z1n+z2n)],device=dev)])
-                                st['nu']=torch.cat([st['nu'],torch.tensor([0.5*(z1n-z2n)**2],device=dev)])
-                                st['S2']=torch.cat([st['S2'],torch.tensor([al*al],device=dev)])
-                                st['age']=torch.cat([st['age'],torch.zeros(1,device=dev)])
-                                st['fails']=torch.cat([st['fails'],torch.zeros(1,device=dev,dtype=torch.long)])
-                    else:
-                        dev=p.device
-                        z1n=torch.diagonal(Uf.T@g1@Vf); z2n=torch.diagonal(Uf.T@g2@Vf)
-                        st['Ut']=Uf.clone(); st['Vt']=Vf.clone()
-                        st['mh']=0.5*(z1n+z2n); st['nu']=0.5*(z1n-z2n).square()
-                        st['S2']=torch.full((len(fresh),),al*al,device=dev)
-                        st['age']=torch.zeros(len(fresh),device=dev)
-                        st['fails']=torch.zeros(len(fresh),device=dev,dtype=torch.long)
+                                z1n=float((u.T@g1@v)); z2n=float((u.T@g2@v))
+                                if st['Ut'] is None:
+                                    st['Ut']=u.clone(); st['Vt']=v.clone()
+                                    st['mh']=torch.tensor([0.5*(z1n+z2n)],device=dev)
+                                    st['nu']=torch.tensor([0.5*(z1n-z2n)**2],device=dev)
+                                    st['S2']=torch.tensor([al*al],device=dev)
+                                    st['age']=torch.zeros(1,device=dev)
+                                    st['fails']=torch.zeros(1,device=dev,dtype=torch.long)
+                                else:
+                                    st['Ut']=torch.cat([st['Ut'],u],1); st['Vt']=torch.cat([st['Vt'],v],1)
+                                    st['mh']=torch.cat([st['mh'],torch.tensor([0.5*(z1n+z2n)],device=dev)])
+                                    st['nu']=torch.cat([st['nu'],torch.tensor([0.5*(z1n-z2n)**2],device=dev)])
+                                    st['S2']=torch.cat([st['S2'],torch.tensor([al*al],device=dev)])
+                                    st['age']=torch.cat([st['age'],torch.zeros(1,device=dev)])
+                                    st['fails']=torch.cat([st['fails'],torch.zeros(1,device=dev,dtype=torch.long)])
+                            else: pend.append(i)
+                st['pU']=Uf[:,pend].clone() if len(fresh) and len(pend) else None
+                st['pV']=Vf[:,pend].clone() if len(fresh) and len(pend) else None
                 J=0 if st['Ut'] is None else st['Ut'].shape[1]
                 if J>0:
                     c=crad*(st['S2']*st['nu']/2).sqrt()
-                    a=(st['mh'].abs()-c).clamp_min(0)
+                    a=(st['mh'].abs()-c).clamp_min(0)*(st['age']>=gr['amin'])
                     d=a/(a.square()+gr['lam']*st['nu']+gr['tau']**2).sqrt()
                     Zom=-(st['Ut']*(torch.sign(st['mh'])*d).unsqueeze(0))@st['Vt'].T
                     mature=int(((st['age']>=gr['amin'])&(a>0)).sum())
