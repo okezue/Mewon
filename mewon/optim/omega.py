@@ -5,8 +5,8 @@ from .ops import rectsvd
 from .core import mpmed,despike,align
 
 class MewonO(Optimizer):
-    def __init__(self,params,lr=1e-3,momentum=0.95,beta2=0.98,alpha=0.05,lam=1.0,tau=1e-8,clip=1.5,kedge=1.5,zeta=0.05,delta=1e-3,amin=3,dmax=5,smin=0.5,rmax=32,eta=2.0,aspect=True,wd=0.0):
-        super().__init__(params,dict(lr=lr,momentum=momentum,beta2=beta2,alpha=alpha,lam=lam,tau=tau,clip=clip,kedge=kedge,zeta=zeta,delta=delta,amin=amin,dmax=dmax,smin=smin,rmax=rmax,eta=eta,aspect=aspect,wd=wd))
+    def __init__(self,params,lr=1e-3,momentum=0.95,beta2=0.98,alpha=0.05,lam=1.0,tau=1e-8,clip=1.5,kedge=1.5,zeta=0.05,delta=1e-3,amin=3,dmax=5,smin=0.5,rmax=32,eta=2.0,gamma=0.2,aspect=True,wd=0.0):
+        super().__init__(params,dict(lr=lr,momentum=momentum,beta2=beta2,alpha=alpha,lam=lam,tau=tau,clip=clip,kedge=kedge,zeta=zeta,delta=delta,amin=amin,dmax=dmax,smin=smin,rmax=rmax,eta=eta,gamma=gamma,aspect=aspect,wd=wd))
     @torch.no_grad()
     def step(self,closure=None):
         loss=None
@@ -27,7 +27,7 @@ class MewonO(Optimizer):
                 if 'm' not in st:
                     st.update(m=torch.zeros_like(p,dtype=torch.float32),rbar=0.0,sg=0.0,step=0,qmed=mpmed(*p.shape),
                               Ut=None,Vt=None,mh=None,nu=None,S2=None,age=None,fails=None,
-                              A=torch.zeros(3),prevZ=None,metrics={})
+                              A=torch.zeros(4),prevZ=None,mc=torch.zeros_like(p,dtype=torch.float32),nc=torch.zeros_like(p,dtype=torch.float32),w2=0.0,metrics={})
                 st['step']+=1
                 if gr['clip']:
                     n1,n2=float(g1.norm()),float(g2.norm())
@@ -39,11 +39,16 @@ class MewonO(Optimizer):
                     R=th
                 else: R=float(max(g1.norm(),g2.norm()))
                 gb=0.5*(g1+g2)
+                st['mc']=(1-al)*st['mc']+al*gb
+                st['nc']=(1-al)*st['nc']+al*0.5*(g1-g2).square()
+                st['w2']=(1-al)**2*st['w2']+al*al
                 if st['prevZ'] is not None:
+                    kf=math.sqrt(min(p.shape)); gbn=float(gb.norm())
                     for j,Z in enumerate(st['prevZ']):
                         zn=float(Z.norm()) if Z is not None else 0.0
-                        l=-float((gb*Z).sum())/(float(gb.norm())*zn+1e-12) if zn>0 else 0.0
-                        st['A'][j]=0.9*st['A'][j]+0.1*l
+                        nz=zn/kf
+                        cs=float((gb*Z).sum())/(gbn*zn+1e-12) if zn>0 else 0.0
+                        st['A'][j]=0.9*st['A'][j]+0.1*(-cs*nz+0.5*gr['gamma']*nz*nz)
                 w=torch.softmax(-gr['eta']*st['A'],0)
                 k=min(p.shape); phi=max(p.shape)/k; rk=math.sqrt(k)
                 bc=1-b**st['step']
@@ -135,10 +140,16 @@ class MewonO(Optimizer):
                     else: gres=gb
                     zt=gr['zeta']*(1-float(gt.square().mean()))
                     Zfr=Zfr+(-zt)*gres/(gres.norm()/math.sqrt(p.numel())+1e-12)
-                Z=w[0]*Zom+w[1]*Zfr
+                if st['step']*al>=1:
+                    cradc=math.sqrt(2*math.log(2*p.numel()/gr['delta']))
+                    cco=cradc*(st['w2']*st['nc']/2).sqrt()
+                    aco=(st['mc'].abs()-cco).clamp_min(0)
+                    Zco=-torch.sign(st['mc'])*aco/(aco.square()+gr['lam']*st['nc']+gr['tau']**2).sqrt()
+                else: aco=torch.zeros(1); Zco=torch.zeros_like(p,dtype=torch.float32)
+                Z=w[0]*Zom+w[1]*Zfr+w[2]*Zco
                 a2=(p.shape[0]/p.shape[1])**0.5 if gr['aspect'] else 1.0
-                st['prevZ']=[Zom,Zfr,torch.zeros_like(Zfr)]
-                st['metrics']={'natoms':J,'mature':mature,'nfresh':int(len(fresh)),'w_om':float(w[0]),'w_fr':float(w[1]),'w_zero':float(w[2]),'sig':sig}
+                st['prevZ']=[Zom,Zfr,Zco,torch.zeros_like(Zfr)]
+                st['metrics']={'natoms':J,'mature':mature,'nfresh':int(len(fresh)),'w_om':float(w[0]),'w_fr':float(w[1]),'w_co':float(w[2]),'w_zero':float(w[3]),'nco':int((aco>0).sum()),'sig':sig}
                 p.add_((a2*Z).to(p.dtype),alpha=gr['lr'])
         return loss
     def diagstate(self):

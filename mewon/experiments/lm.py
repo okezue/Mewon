@@ -1,7 +1,7 @@
 import torch
 from mewon.data.char import CharDataset,corpus,splittext
 from mewon.models.gpt import GPT
-from mewon.optim import Mewon,MewonP,MewonR,Muon,ExactSoftMuon
+from mewon.optim import Mewon,MewonP,MewonR,MewonO,Muon,ExactSoftMuon
 from mewon.tracking import RunLogger
 from mewon.utils import setseed,splitparams,getdev
 
@@ -16,6 +16,7 @@ def buildopt(model,name,lr,rank=8,freq=4,piters=1):
     elif name=='mewondiag': so=MewonP(spec,lr=lr,mode='diag',rank=rank,freq=freq,piters=piters)
     elif name=='mewoncore': so=MewonP(spec,lr=lr,mode='core',rank=rank,freq=freq,piters=piters)
     elif name=='mewonp': so=MewonP(spec,lr=lr,mode='softpolar',rank=rank,freq=freq,piters=piters,resid=0.05)
+    elif name=='mewono': so=MewonO(spec,lr=lr)
     else: so=Mewon(spec,lr=lr)
     return [o for o in [so,ao] if o is not None]
 
@@ -34,11 +35,29 @@ def run(outdir,seed=0,opt='mewon',steps=100,dev=None,nlayer=2,nhead=2,nembd=64,b
     if lr is None: lr=0.03 if opt!='adamw' else 2e-3
     opts=buildopt(model,opt,lr,rank,freq,piters)
     log=RunLogger(outdir,f'lm-{opt}-seed{seed}',{'optimizer':opt,'steps':steps})
+    twoview=opt=='mewono'
     for step in range(steps):
         x,y=data.getbatch(bs,dev)
         for o in opts: o.zero_grad(set_to_none=True)
-        _,loss=model(x,y); loss.backward(); torch.nn.utils.clip_grad_norm_(model.parameters(),1.0)
+        if twoview:
+            h=bs//2
+            _,l1=model(x[:h],y[:h]); l1.backward()
+            gs={p:p.grad.detach().clone() for p in model.parameters() if p.grad is not None}
+            for p in model.parameters(): p.grad=None
+            _,l2=model(x[h:],y[h:]); l2.backward()
+            loss=0.5*(l1.detach()+l2.detach())
+            for p in model.parameters():
+                if p.grad is not None and p in gs:
+                    g2=p.grad.detach().clone()
+                    if p.ndim==2: p.views=[gs[p],g2]
+                    p.grad=0.5*(gs[p]+g2)
+        else:
+            _,loss=model(x,y); loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(),1.0)
         for o in opts: o.step()
+        if twoview:
+            for p in model.parameters():
+                if hasattr(p,'views'): del p.views
         if step%10==0 or step==steps-1:
             metrics={'train_loss':float(loss.detach().cpu()),'eval_loss':evaluate(model,val,dev,batches=4)}
             for o in opts:
